@@ -1658,3 +1658,155 @@ body.sidebar-open {
     color: #3498db;
     background: #f8f9fa;
 }
+
+/* 雨云宣传部分样式 */
+.promotion-section {
+    padding: 60px 0;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.promotion-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.promotion-card {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    position: relative;
+    border: 2px solid #3498db;
+}
+
+.promotion-badge {
+    position: absolute;
+    top: -12px;
+    left: 24px;
+    background: #e74c3c;
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+}
+
+.promotion-content {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 24px;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.promotion-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 36px;
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.3);
+}
+
+.promotion-text {
+    flex: 1;
+}
+
+.promotion-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #2c3e50;
+}
+
+.promotion-description {
+    color: #7f8c8d;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+}
+
+.promotion-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.promotion-feature {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #27ae60;
+    font-weight: 500;
+}
+
+.promotion-feature i {
+    font-size: 20px;
+}
+
+.promotion-actions {
+    text-align: center;
+    border-top: 1px solid #ecf0f1;
+    padding-top: 24px;
+}
+
+.promotion-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 32px;
+    background: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.promotion-btn:hover {
+    background: #2980b9;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .promotion-section {
+        padding: 40px 0;
+    }
+    
+    .promotion-card {
+        padding: 24px;
+    }
+    
+    .promotion-content {
+        grid-template-columns: 1fr;
+        text-align: center;
+        gap: 20px;
+    }
+    
+    .promotion-icon {
+        margin: 0 auto;
+    }
+    
+    .promotion-title {
+        font-size: 1.5rem;
+    }
+    
+    .promotion-description {
+        font-size: 1rem;
+    }
+    
+    .promotion-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
