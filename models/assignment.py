@@ -30,5 +30,5 @@ class Assignment(db.Model):
             'teacher_name': self.teacher.username if self.teacher else None,
             'created_at': format_china_time(self.created_at),
             'updated_at': format_china_time(self.updated_at),
-            'whiteboard_name': self.whiteboard.name if self.whiteboard else None
+            'whiteboard_name': self.whiteboard.name if self.whiteboard else None,
         }

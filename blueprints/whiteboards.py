@@ -10,8 +10,33 @@ from models.announcement import Announcement
 from utils.auth_utils import login_required, teacher_required
 from utils.code_utils import generate_whiteboard_credentials
 from utils.time_utils import get_china_time, format_china_time, parse_china_time
+from utils.classworkskv_utils import test_classworkskv_connection, connect_whiteboard_to_classworkskv
 
 whiteboards_bp = Blueprint('whiteboards', __name__, url_prefix='/whiteboards')
+
+# 测试连接
+@whiteboards_bp.route('/test-classworkskv-connection', methods=['POST'])
+@login_required
+@teacher_required
+def test_classworkskv_connection_global():
+    """全局测试 ClassworksKV 连接"""
+    data = request.get_json()
+    namespace = data.get('namespace')
+    password = data.get('password')
+    
+    if not namespace or not password:
+        return jsonify({'error': '命名空间和密码不能为空'}), 400
+    
+    success, message = test_classworkskv_connection(namespace, password)
+    
+    if success:
+        return jsonify({
+            'success': True, 
+            'message': '连接测试成功！',
+            'token': message  # 返回token
+        })
+    else:
+        return jsonify({'error': f'连接测试失败: {message}'}), 400
 
 @whiteboards_bp.route('/<int:whiteboard_id>', methods=['GET', 'POST'])
 @login_required
@@ -41,16 +66,6 @@ def view_whiteboard(whiteboard_id):
     class_subjects = ClassSubject.query.filter_by(class_id=whiteboard.class_id).all()
     class_subjects_list = [subject.subject_name for subject in class_subjects]
     
-#    if request.method == 'POST' and 'subjects' in request.form:
-#        if not is_class_teacher:
-#            flash('只有班主任可以设置白板科目', 'error')
-#            return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))
-#        
-#        subjects = request.form.get('subjects')
-#        whiteboard.subjects = subjects
-#        db.session.commit()
-#        flash('科目设置已更新', 'success')
-#        return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))
     if whiteboard.token is None:
         has_token = False
         token_value = None
@@ -83,7 +98,7 @@ def view_whiteboard(whiteboard_id):
         assignment.due_date_str = format_china_time(assignment.due_date)
     
     whiteboard.created_at_str = format_china_time(whiteboard.created_at)
-    print("白板token：", whiteboard.token)
+    
     return render_template('view_whiteboard.html', 
                          username=session.get('username'),
                          role=session.get('role'),
@@ -151,10 +166,25 @@ def create_whiteboard(class_id):
     
     if request.method == 'POST':
         name = request.form.get('name')
+        use_classworkskv = request.form.get('use_classworkskv') == 'on'
+        classworkskv_namespace = request.form.get('classworkskv_namespace')
+        classworkskv_password = request.form.get('classworkskv_password')
         
         if not name:
             flash('白板名称不能为空', 'error')
             return render_template('create_whiteboard.html', class_obj=class_obj)
+        
+        # 如果启用 ClassworksKV，验证连接
+        if use_classworkskv:
+            if not classworkskv_namespace or not classworkskv_password:
+                flash('启用 ClassworksKV 需要填写命名空间和密码', 'error')
+                return render_template('create_whiteboard.html', class_obj=class_obj)
+            
+            # 测试 ClassworksKV 连接
+            success, message = test_classworkskv_connection(classworkskv_namespace, classworkskv_password)
+            if not success:
+                flash(f'ClassworksKV 连接失败: {message}', 'error')
+                return render_template('create_whiteboard.html', class_obj=class_obj)
         
         board_id, secret_key = generate_whiteboard_credentials()
         
@@ -162,13 +192,27 @@ def create_whiteboard(class_id):
             name=name,
             board_id=board_id,
             secret_key=secret_key,
-            class_id=class_id
+            class_id=class_id,
+            use_classworkskv=use_classworkskv
         )
+        
+        # 如果启用 ClassworksKV，保存连接信息
+        if use_classworkskv:
+            whiteboard.classworkskv_namespace = classworkskv_namespace
+            whiteboard.classworkskv_password = classworkskv_password
+            whiteboard.classworkskv_connected = True
+            whiteboard.classworkskv_token = message  # 这里 message 是 token
+            whiteboard.classworkskv_last_sync = get_china_time().replace(tzinfo=None)
         
         try:
             db.session.add(whiteboard)
             db.session.commit()
-            flash(f'白板 "{name}" 创建成功！', 'success')
+            
+            if use_classworkskv:
+                flash(f'白板 "{name}" 创建成功！已连接到 ClassworksKV。', 'success')
+            else:
+                flash(f'白板 "{name}" 创建成功！', 'success')
+                
             return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard.id))
         except Exception as e:
             db.session.rollback()
@@ -270,3 +314,60 @@ def get_history(whiteboard_id):
     history.sort(key=lambda x: x['created_at'], reverse=True)
     
     return jsonify({'success': True, 'data': history})
+
+@whiteboards_bp.route('/<int:whiteboard_id>/connect_classworkskv', methods=['POST'])
+@login_required
+@teacher_required
+def connect_classworkskv(whiteboard_id):
+    """连接白板到 ClassworksKV"""
+    whiteboard = Whiteboard.query.get_or_404(whiteboard_id)
+    user = db.session.get(User, session['user_id'])
+    
+    if whiteboard.class_obj.teacher_id != user.id:
+        flash('只有班主任可以配置 ClassworksKV', 'error')
+        return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))
+    
+    namespace = request.form.get('namespace')
+    password = request.form.get('password')
+    
+    if not namespace or not password:
+        flash('请填写命名空间和密码', 'error')
+        return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))
+    
+    success, message = connect_whiteboard_to_classworkskv(whiteboard, namespace, password)
+    
+    if success:
+        from utils.classworkskv_utils import migrate_assignments_to_classworkskv
+        # 如果连接成功，迁移现有数据
+        migrate_success, migrate_message = migrate_assignments_to_classworkskv(whiteboard)
+        if migrate_success:
+            flash(f'{message}，{migrate_message}', 'success')
+        else:
+            flash(f'{message}，但数据迁移失败: {migrate_message}', 'warning')
+    else:
+        flash(f'连接失败: {message}', 'error')
+    
+    return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))
+
+@whiteboards_bp.route('/<int:whiteboard_id>/disconnect_classworkskv', methods=['POST'])
+@login_required
+@teacher_required
+def disconnect_classworkskv(whiteboard_id):
+    """断开白板与 ClassworksKV 的连接"""
+    whiteboard = Whiteboard.query.get_or_404(whiteboard_id)
+    user = db.session.get(User, session['user_id'])
+    
+    if whiteboard.class_obj.teacher_id != user.id:
+        flash('只有班主任可以配置 ClassworksKV', 'error')
+        return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))
+    
+    whiteboard.use_classworkskv = False
+    whiteboard.classworkskv_connected = False
+    whiteboard.classworkskv_namespace = None
+    whiteboard.classworkskv_password = None
+    whiteboard.classworkskv_token = None
+    
+    db.session.commit()
+    
+    flash('已断开与 ClassworksKV 的连接', 'success')
+    return redirect(url_for('whiteboards.view_whiteboard', whiteboard_id=whiteboard_id))

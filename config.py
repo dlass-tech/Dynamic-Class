@@ -34,3 +34,7 @@ class Config:
     SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
     SMTP_USE_TLS = os.environ.get('SMTP_USE_TLS', 'True').lower() == 'true'
     SITE_URL = os.environ.get('SITE_URL', 'http://localhost:5000')
+
+    # Classworks KV
+    CLASSWORKS_ID = os.environ.get('CLASSWORKS_ID', 'aaaaaaa')
+    CLASSWORKS_PASS = os.environ.get('CLASSWORKS_PASS', 'bbbbbbb')

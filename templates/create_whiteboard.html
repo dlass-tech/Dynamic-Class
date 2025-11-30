@@ -15,23 +15,79 @@
         
         <div class="form-card">
             <div class="card-content">
-                <form method="POST" class="whiteboard-form">
+                <form method="POST" class="whiteboard-form" id="create-whiteboard-form">
                     <div class="form-group">
-                        <label for="name" class="form-label">白板名称</label>
-                        <input type="text" id="name" name="name" class="form-input" required>
+                        <label for="name" class="form-label">白板名称 *</label>
+                        <input type="text" id="name" name="name" class="form-input" required 
+                               placeholder="例如：教室前白板、实验室白板等">
+                    </div>
+                    
+                    <!-- ClassworksKV 选项 -->
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="use_classworkskv" name="use_classworkskv" class="checkbox-input">
+                            <span class="checkbox-custom"></span>
+                            使用 ClassworksKV 存储作业
+                        </label>
+                        <div class="form-hint">
+                            启用后，作业将存储在 ClassworksKV 云端，而不是本地数据库。这可以实现多设备同步。
+                        </div>
+                    </div>
+                    
+                    <div id="classworkskv-fields" style="display: none;">
+                        <div class="form-group">
+                            <label for="classworkskv_namespace" class="form-label">ClassworksKV 命名空间 *</label>
+                            <input type="text" id="classworkskv_namespace" name="classworkskv_namespace" class="form-input"
+                                   placeholder="在 ClassworksKV 中创建的设备命名空间">
+                            <div class="form-hint">
+                                在 ClassworksKV 中创建的设备唯一标识符
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="classworkskv_password" class="form-label">ClassworksKV 密码 *</label>
+                            <input type="password" id="classworkskv_password" name="classworkskv_password" class="form-input"
+                                   placeholder="设备的访问密码">
+                            <div class="form-hint">
+                                设备的访问密码，请确保密码正确
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" id="test-connection-btn" class="outline-btn">
+                                <i class="material-icons" style="font-size: 16px; margin-right: 8px;">wifi_tethering</i>
+                                <span class="btn-label">测试连接</span>
+                            </button>
+                        </div>
+                        
+                        <div id="connection-result" style="display: none; margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 14px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <i class="material-icons" id="connection-icon" style="font-size: 18px;"></i>
+                                <span id="connection-message"></span>
+                            </div>
+                        </div>
+
+                        <div class="form-info" style="margin-top: 16px;">
+                            <p class="info-text" style="font-size: 13px; color: #7f8c8d;">
+                                <strong>提示：</strong>在创建白板前，请确保 ClassworksKV 连接测试成功。
+                                如果测试失败，请检查命名空间和密码是否正确，或联系系统管理员。
+                            </p>
+                        </div>
                     </div>
                     
                     <div class="form-info">
                         <p class="info-text">
-                            创建后将生成唯一的白板ID和密钥，用于白板客户端连接。
+                            创建后将生成唯一的白板ID和密钥，用于白板客户端连接。白板创建后可以在设置中修改 ClassworksKV 配置。
                         </p>
                     </div>
                     
                     <div class="form-actions">
-                        <button type="submit" class="primary-btn">
+                        <button type="submit" class="primary-btn" id="submit-btn">
+                            <i class="material-icons" style="font-size: 18px; margin-right: 8px;">add</i>
                             <span class="btn-label">创建白板</span>
                         </button>
                         <a href="{{ url_for('classes.view_class', class_id=class_obj.id) }}" class="outline-btn">
+                            <i class="material-icons" style="font-size: 18px; margin-right: 8px;">cancel</i>
                             <span class="btn-label">取消</span>
                         </a>
                     </div>
@@ -40,4 +96,298 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const useClassworkskvCheckbox = document.getElementById('use_classworkskv');
+    const classworkskvFields = document.getElementById('classworkskv-fields');
+    const testConnectionBtn = document.getElementById('test-connection-btn');
+    const connectionResult = document.getElementById('connection-result');
+    const connectionIcon = document.getElementById('connection-icon');
+    const connectionMessage = document.getElementById('connection-message');
+    const submitBtn = document.getElementById('submit-btn');
+    const form = document.getElementById('create-whiteboard-form');
+    
+    let connectionTested = false;
+    let connectionSuccessful = false;
+    
+    // 切换 ClassworksKV 字段显示
+    useClassworkskvCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            classworkskvFields.style.display = 'block';
+        } else {
+            classworkskvFields.style.display = 'none';
+            connectionResult.style.display = 'none';
+            connectionTested = false;
+            connectionSuccessful = false;
+        }
+    });
+    
+    // 测试连接
+    testConnectionBtn.addEventListener('click', function() {
+        const namespace = document.getElementById('classworkskv_namespace').value.trim();
+        const password = document.getElementById('classworkskv_password').value.trim();
+        
+        if (!namespace) {
+            showConnectionResult('请输入命名空间', 'error');
+            document.getElementById('classworkskv_namespace').focus();
+            return;
+        }
+        
+        if (!password) {
+            showConnectionResult('请输入密码', 'error');
+            document.getElementById('classworkskv_password').focus();
+            return;
+        }
+        
+        setButtonLoading(testConnectionBtn, true);
+        showConnectionResult('正在测试连接...', 'loading');
+        
+        fetch('{{ url_for("whiteboards.test_classworkskv_connection_global") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                namespace: namespace,
+                password: password
+            })
+        })
+        .then(response => {
+            return response.json().then(data => {
+                if (data.success) {
+                    connectionTested = true;
+                    connectionSuccessful = true;
+                    showConnectionResult(data.message, 'success');
+                    
+                    if (data.token) {
+                        console.log('获取到Token:', data.token);
+                    }
+                } else {
+                    throw new Error(data.error || '连接测试失败');
+                }
+            });
+        })
+        .catch(error => {
+            connectionTested = true;
+            connectionSuccessful = false;
+            showConnectionResult(error.message, 'error');
+            console.error('连接测试错误:', error);
+        })
+        .finally(() => {
+            setButtonLoading(testConnectionBtn, false);
+        });
+    });
+    
+    // 表单提交验证
+    form.addEventListener('submit', function(e) {
+        if (useClassworkskvCheckbox.checked) {
+            const namespace = document.getElementById('classworkskv_namespace').value.trim();
+            const password = document.getElementById('classworkskv_password').value.trim();
+            
+            if (!namespace || !password) {
+                e.preventDefault();
+                showToast('启用 ClassworksKV 需要填写命名空间和密码', 'error');
+                return;
+            }
+            
+            if (!connectionTested) {
+                e.preventDefault();
+                showToast('请先测试 ClassworksKV 连接', 'error');
+                testConnectionBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            
+            if (!connectionSuccessful) {
+                e.preventDefault();
+                showToast('ClassworksKV 连接测试失败，请检查配置后重试', 'error');
+                testConnectionBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+        }
+    });
+    
+    function showConnectionResult(message, type) {
+        connectionMessage.textContent = message;
+        connectionResult.style.display = 'block';
+        
+        // 根据类型设置样式
+        switch(type) {
+            case 'success':
+                connectionResult.style.backgroundColor = '#d4edda';
+                connectionResult.style.color = '#155724';
+                connectionResult.style.border = '1px solid #c3e6cb';
+                connectionIcon.textContent = 'check_circle';
+                connectionIcon.style.color = '#28a745';
+                break;
+            case 'error':
+                connectionResult.style.backgroundColor = '#f8d7da';
+                connectionResult.style.color = '#721c24';
+                connectionResult.style.border = '1px solid #f5c6cb';
+                connectionIcon.textContent = 'error';
+                connectionIcon.style.color = '#dc3545';
+                break;
+            case 'loading':
+                connectionResult.style.backgroundColor = '#d1ecf1';
+                connectionResult.style.color = '#0c5460';
+                connectionResult.style.border = '1px solid #bee5eb';
+                connectionIcon.textContent = 'schedule';
+                connectionIcon.style.color = '#17a2b8';
+                break;
+        }
+    }
+    
+    function setButtonLoading(button, isLoading) {
+        const icon = button.querySelector('.material-icons');
+        const span = button.querySelector('span');
+        
+        if (isLoading) {
+            button.disabled = true;
+            span.textContent = '测试中...';
+            icon.textContent = 'autorenew';
+            icon.style.animation = 'spin 1s linear infinite';
+            button.classList.add('loading');
+        } else {
+            button.disabled = false;
+            span.textContent = '测试连接';
+            icon.textContent = 'wifi_tethering';
+            icon.style.animation = '';
+            button.classList.remove('loading');
+        }
+    }
+    
+    function showToast(message, type = 'info') {
+        // 创建Toast元素
+        const toast = document.createElement('div');
+        toast.className = `toast-message ${type}`;
+        toast.innerHTML = `
+            <div class="toast-content">
+                <i class="material-icons">${type === 'error' ? 'error' : 'info'}</i>
+                <span>${message}</span>
+            </div>
+        `;
+        
+        // 添加样式
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'error' ? '#e74c3c' : '#3498db'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease;
+            max-width: 400px;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // 3秒后自动移除
+        setTimeout(() => {
+            toast.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+    
+    // 输入框变化时重置连接状态
+    const namespaceInput = document.getElementById('classworkskv_namespace');
+    const passwordInput = document.getElementById('classworkskv_password');
+    
+    [namespaceInput, passwordInput].forEach(input => {
+        input.addEventListener('input', function() {
+            if (connectionTested) {
+                connectionTested = false;
+                connectionSuccessful = false;
+                connectionResult.style.display = 'none';
+            }
+        });
+    });
+});
+
+// 添加CSS动画
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    .primary-btn.loading, .outline-btn.loading {
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+`;
+document.head.appendChild(style);
+</script>
+
+<style>
+.primary-btn, .outline-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-message .toast-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toast-message .material-icons {
+    font-size: 18px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.checkbox-input {
+    margin-right: 8px;
+}
+
+.form-hint {
+    font-size: 13px;
+    color: #7f8c8d;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+#classworkskv-fields {
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    margin-top: 8px;
+}
+</style>
 {% endblock %}

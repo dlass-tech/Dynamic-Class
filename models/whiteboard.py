@@ -1,4 +1,3 @@
-# models/whiteboard.py
 from extensions import db
 from utils.time_utils import get_china_time, format_china_time
 import secrets
@@ -16,6 +15,14 @@ class Whiteboard(db.Model):
     last_heartbeat = db.Column(db.DateTime)
     token = db.Column(db.String(100), unique=True)
     token_created_at = db.Column(db.DateTime, default=get_china_time)
+    
+    # ClassworksKV
+    use_classworkskv = db.Column(db.Boolean, default=False)
+    classworkskv_namespace = db.Column(db.String(100), nullable=True)
+    classworkskv_password = db.Column(db.String(100), nullable=True)
+    classworkskv_token = db.Column(db.Text, nullable=True)
+    classworkskv_connected = db.Column(db.Boolean, default=False)
+    classworkskv_last_sync = db.Column(db.DateTime, nullable=True)
     
     class_obj = db.relationship('Class', backref=db.backref('whiteboards', lazy=True))
     
@@ -35,7 +42,11 @@ class Whiteboard(db.Model):
             'is_online': self.is_online,
             'last_heartbeat': format_china_time(self.last_heartbeat),
             'token': self.token,
-            'token_created_at': format_china_time(self.token_created_at)
+            'token_created_at': format_china_time(self.token_created_at),
+            # ClassworksKV 信息
+            'use_classworkskv': self.use_classworkskv,
+            'classworkskv_connected': self.classworkskv_connected,
+            'classworkskv_last_sync': format_china_time(self.classworkskv_last_sync) if self.classworkskv_last_sync else None
         }
     
     def generate_token(self):
