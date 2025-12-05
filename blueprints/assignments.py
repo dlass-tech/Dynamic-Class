@@ -12,15 +12,14 @@ import json
 
 assignments_bp = Blueprint('assignments', __name__)
 
-def save_assignment_to_classworkskv(whiteboard, assignment):
+def save_assignment_to_classworkskv(whiteboard, assignment, start_date, due_date):
     """保存作业到 ClassworksKV"""
     if not whiteboard.classworkskv_connected:
         return False, "白板未连接到 ClassworksKV"
-    
     client = ClassworksKVClient(whiteboard.classworkskv_namespace, whiteboard.classworkskv_password)
     client.token = whiteboard.classworkskv_token
     
-    date_str = assignment.due_date.strftime('%Y%m%d')
+    date_str = start_date.strftime('%Y%m%d')
     
     # 获取现有数据
     success, existing_data = client.get_homework_data(date_str)
@@ -32,7 +31,7 @@ def save_assignment_to_classworkskv(whiteboard, assignment):
     homework_data[assignment.subject] = {
         "content": assignment.description,
         "title": assignment.title,
-        "due_date": assignment.due_date.isoformat()
+        "due_date": due_date.strftime('%Y%m%d')
     }
     
     # 保存更新后的数据
@@ -106,6 +105,7 @@ def create_assignment(whiteboard_id):
     description = data.get('description')
     subject = data.get('subject')
     due_date_str = data.get('due_date')
+    start_date_str = data.get('start_date')
     
     if not all([title, description, subject, due_date_str]):
         return jsonify({'error': '所有字段都必须填写'}), 400
@@ -116,6 +116,7 @@ def create_assignment(whiteboard_id):
     
     try:
         due_date = parse_china_time(due_date_str)
+        start_date = parse_china_time(start_date_str)
     except ValueError:
         return jsonify({'error': '日期格式无效'}), 400
     
@@ -129,13 +130,14 @@ def create_assignment(whiteboard_id):
                 subject=subject,
                 due_date=due_date,
                 whiteboard_id=whiteboard_id,
-                teacher_id=user.id
+                teacher_id=user.id,
+                created_at=get_china_time()
             )
             db.session.add(assignment)
             db.session.commit()
             
             # 保存到 ClassworksKV
-            success, message = save_assignment_to_classworkskv(whiteboard, assignment)
+            success, message = save_assignment_to_classworkskv(whiteboard, assignment, start_date, due_date)
             if not success:
                 # 如果保存到 ClassworksKV 失败，删除Dlass记录
                 db.session.delete(assignment)
