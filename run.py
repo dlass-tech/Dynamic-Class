@@ -20,7 +20,7 @@ def main():
             host='0.0.0.0',
             port=5000,
             debug=True,
-            use_reloader=False,
+            use_reloader=True,
             allow_unsafe_werkzeug=True
         )
     except Exception as e:

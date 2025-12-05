@@ -356,6 +356,11 @@
                                     <textarea id="assignment-description" class="form-textarea" rows="3" required disabled></textarea>
                                 </div>
                                 
+                                <div class="form-group assignment-field" data-field="start-date">
+                                    <label for="assignment-start-date">发布日期</label>
+                                    <input type="datetime-local" id="assignment-start-date" class="form-input" required disabled>
+                                </div>
+
                                 <div class="form-group assignment-field" data-field="due-date">
                                     <label for="assignment-due-date">截止时间</label>
                                     <input type="datetime-local" id="assignment-due-date" class="form-input" required disabled>
@@ -633,10 +638,18 @@ async function checkExistingAssignment(subject) {
             document.getElementById('assignment-title').value = result.assignment.title;
             document.getElementById('assignment-description').value = result.assignment.description;
             
-            // 正确格式化日期时间
-            const dueDate = new Date(result.assignment.due_date);
-            const formattedDate = dueDate.toISOString().slice(0, 16);
-            document.getElementById('assignment-due-date').value = formattedDate;
+            // 正确处理日期时间，不再使用toISOString()
+            if (result.assignment.due_date) {
+                const dueDate = new Date(result.assignment.due_date);
+                // 获取本地时间字符串，格式为 YYYY-MM-DDTHH:MM
+                const year = dueDate.getFullYear();
+                const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+                const day = String(dueDate.getDate()).padStart(2, '0');
+                const hours = String(dueDate.getHours()).padStart(2, '0');
+                const minutes = String(dueDate.getMinutes()).padStart(2, '0');
+                
+                document.getElementById('assignment-due-date').value = `${year}-${month}-${day}T${hours}:${minutes}`;
+            }
             
             document.getElementById('assignment-submit-btn').querySelector('span').textContent = '更新作业';
             
@@ -659,6 +672,9 @@ function resetAssignmentForm() {
     document.getElementById('assignment-title').value = '';
     document.getElementById('assignment-description').value = '';
     
+    const now = new Date();
+    document.getElementById('assignment-start-date').value = now.toISOString().slice(0, 16);
+
     // 设置默认截止时间为明天同一时间
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -970,7 +986,7 @@ document.getElementById('create-task-form').addEventListener('submit', async (e)
         priority: parseInt(document.getElementById('task-priority').value),
         action_id: parseInt(document.getElementById('task-action').value),
         subject: subject,
-        due_date: dueDate ? new Date(dueDate).toISOString() : null
+        due_date: dueDate ? dueDate : null  // 直接传递原始字符串
     };
     
     try {
@@ -1052,7 +1068,8 @@ document.getElementById('create-assignment-form').addEventListener('submit', asy
         title: document.getElementById('assignment-title').value,
         description: document.getElementById('assignment-description').value,
         subject: document.getElementById('assignment-subject').value,
-        due_date: new Date(document.getElementById('assignment-due-date').value).toISOString()
+        start_date: document.getElementById('assignment-start-date').value,  // 直接传递原始字符串
+        due_date: document.getElementById('assignment-due-date').value     // 直接传递原始字符串
     };
     
     try {
@@ -1256,7 +1273,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+    document.getElementById('assignment-start-date').value = now.toISOString().slice(0, 16);
     document.getElementById('assignment-due-date').value = tomorrow.toISOString().slice(0, 16);
     
     const dayAfterTomorrow = new Date(now);

@@ -5,7 +5,7 @@ from models.whiteboard import Whiteboard
 from models.task import Task
 from models.class_models import TeacherClass, ClassSubject
 from utils.auth_utils import login_required, teacher_required
-from utils.time_utils import parse_china_time, format_china_time
+from utils.time_utils import parse_datetime_local, format_china_time
 
 tasks_bp = Blueprint('tasks', __name__)
 
@@ -54,9 +54,9 @@ def create_task(whiteboard_id):
     due_date = None
     if due_date_str:
         try:
-            due_date = parse_china_time(due_date_str)
-        except ValueError:
-            return jsonify({'error': '日期格式无效'}), 400
+            due_date = parse_datetime_local(due_date_str)
+        except ValueError as e:
+            return jsonify({'error': f'日期格式无效: {str(e)}'}), 400
     
     task = Task(
         title=title,
@@ -88,7 +88,7 @@ def create_task(whiteboard_id):
         return jsonify({'success': True, 'task_id': task.id})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': '创建任务失败'}), 500
+        return jsonify({'error': f'创建任务失败: {str(e)}'}), 500
 
 @tasks_bp.route('/tasks/<int:task_id>/delete', methods=['POST'])
 @login_required

@@ -5,7 +5,7 @@ from models.whiteboard import Whiteboard
 from models.assignment import Assignment
 from models.class_models import TeacherClass, ClassSubject
 from utils.auth_utils import login_required, teacher_required
-from utils.time_utils import parse_china_time, format_china_time, get_china_time
+from utils.time_utils import parse_datetime_local, parse_china_date, parse_china_time, format_china_time, get_china_time, format_china_date
 from utils.classworkskv_utils import ClassworksKVClient
 from datetime import timedelta
 import json
@@ -26,12 +26,12 @@ def save_assignment_to_classworkskv(whiteboard, assignment, start_date, due_date
     if not success:
         return False, existing_data
     
-    # 更新作业数据
+    # 更新作业数据，使用YYYYMMDD格式
     homework_data = existing_data.get('homework', {})
     homework_data[assignment.subject] = {
         "content": assignment.description,
         "title": assignment.title,
-        "due_date": due_date.strftime('%Y%m%d')
+        "due_date": due_date.strftime('%Y%m%d')  # 保存为YYYYMMDD格式
     }
     
     # 保存更新后的数据
@@ -61,11 +61,18 @@ def get_assignments_from_classworkskv(whiteboard, date_str=None):
     assignments = []
     homework_dict = homework_data.get('homework', {})
     for subject, subject_data in homework_dict.items():
+        # ClassworksKV中的due_date是YYYYMMDD格式
+        due_date_str = subject_data.get('due_date', '')
+        due_date = None
+        if due_date_str:
+            # 使用专门的日期解析函数
+            due_date = parse_china_date(due_date_str)
+        
         assignments.append({
             'subject': subject,
             'title': subject_data.get('title', ''),
             'description': subject_data.get('content', ''),
-            'due_date': parse_china_time(subject_data.get('due_date', '')) if subject_data.get('due_date') else None
+            'due_date': due_date
         })
     
     return True, assignments
@@ -107,7 +114,7 @@ def create_assignment(whiteboard_id):
     due_date_str = data.get('due_date')
     start_date_str = data.get('start_date')
     
-    if not all([title, description, subject, due_date_str]):
+    if not all([title, description, subject, due_date_str, start_date_str]):
         return jsonify({'error': '所有字段都必须填写'}), 400
     
     # 检查学科权限
@@ -115,10 +122,16 @@ def create_assignment(whiteboard_id):
         return jsonify({'error': f'您没有权限发布{subject}学科的作业'}), 403
     
     try:
-        due_date = parse_china_time(due_date_str)
-        start_date = parse_china_time(start_date_str)
-    except ValueError:
-        return jsonify({'error': '日期格式无效'}), 400
+        # 使用专门的datetime-local解析器
+        due_date = parse_datetime_local(due_date_str)
+        start_date = parse_datetime_local(start_date_str)
+        
+        # 验证日期
+        if start_date >= due_date:
+            return jsonify({'error': '开始时间必须早于截止时间'}), 400
+            
+    except ValueError as e:
+        return jsonify({'error': f'日期格式无效: {str(e)}'}), 400
     
     try:
         # 如果使用 ClassworksKV 存储
@@ -222,7 +235,7 @@ def create_assignment(whiteboard_id):
                 return jsonify({'success': True, 'assignment_id': assignment.id, 'storage_type': 'local'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': '操作失败'}), 500
+        return jsonify({'error': f'操作失败: {str(e)}'}), 500
 
 @assignments_bp.route('/whiteboards/<int:whiteboard_id>/check_assignment', methods=['GET'])
 @login_required
@@ -337,7 +350,7 @@ def delete_assignment(assignment_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': '删除作业失败'}), 500
+        return jsonify({'error': f'删除作业失败: {str(e)}'}), 500
 
 @assignments_bp.route('/whiteboards/<int:whiteboard_id>/assignments')
 @login_required
@@ -405,4 +418,4 @@ def get_whiteboard_assignments_list(whiteboard_id):
             
             return jsonify({'success': True, 'assignments': assignments_data})
     except Exception as e:
-        return jsonify({'error': '获取作业列表失败'}), 500
+        return jsonify({'error': f'获取作业列表失败: {str(e)}'}), 500
