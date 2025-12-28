@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  flask-local:
+    build: .  # 基于本地 Dockerfile 构建环境
+    ports:
+      - "5022:5000"  # 宿主机端口:容器端口
+    volumes:
+      - ./:/app  # 本地目录挂载到容器 /app，代码修改实时同步
+    environment:
+      - FLASK_ENV=development  # 开发模式，自动重载
+    command: python run.py

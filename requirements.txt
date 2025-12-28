@@ -9,3 +9,4 @@ flask_migrate
 apscheduler
 pytz==2023.3
 Werkzeug==2.3.7
+psycopg2-binary
