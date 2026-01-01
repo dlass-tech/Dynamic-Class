@@ -38,3 +38,5 @@ class Config:
     # Classworks KV
     CLASSWORKS_ID = os.environ.get('CLASSWORKS_ID', 'aaaaaaa')
     CLASSWORKS_PASS = os.environ.get('CLASSWORKS_PASS', 'bbbbbbb')
+
+    PORT = os.environ.get('PORT', '5000')

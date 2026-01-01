@@ -10,10 +10,10 @@ load_dotenv()
 class EmailSender:
     def __init__(self):
         self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.qq.com')
-        self.smtp_port = int(os.getenv('SMTP_PORT', 587))
+        self.smtp_port = int(os.getenv('SMTP_PORT', 465))
         self.sender_email = os.getenv('SMTP_EMAIL')
         self.sender_password = os.getenv('SMTP_PASSWORD')
-        self.use_tls = os.getenv('SMTP_USE_TLS', 'True').lower() == 'true'
+        self.use_ssl = os.getenv('SMTP_USE_SSL', 'True').lower() == 'true'
     
     def send_invitation_email(self, to_email, class_name, class_code, inviter_name, is_existing_user=True):
         """发送班级邀请邮件"""
@@ -59,11 +59,16 @@ class EmailSender:
             
             msg.attach(MIMEText(body, 'html'))
             
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                if self.use_tls:
-                    server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.send_message(msg)
+            if self.use_ssl:
+                with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
+                    server.login(self.sender_email, self.sender_password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                    if self.smtp_port == 587:  # 如果是587端口，使用STARTTLS
+                        server.starttls()
+                    server.login(self.sender_email, self.sender_password)
+                    server.send_message(msg)
             
             current_app.logger.info(f"邀请邮件发送成功: {to_email}")
             return True
