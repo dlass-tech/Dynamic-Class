@@ -219,7 +219,7 @@ X-Secret-Key: your_secret_key
 
 · 项目主页: https://dlass.tech
 · 问题反馈: GitHub Issues
-· 邮箱联系: zhaishis06@163.com
+· 邮箱联系: sn@dy.ci
 · 技术交流群: 745977590
 
 🙏 致谢
@@ -235,5 +235,3 @@ X-Secret-Key: your_secret_key
 ⬆ 返回顶部
 
 </div>
-
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
